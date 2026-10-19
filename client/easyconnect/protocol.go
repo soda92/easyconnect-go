@@ -136,12 +136,22 @@ func (c *Client) RecvConn() (*tls.UConn, error) {
 	log.DebugPrintf("Recv handshake: read %d bytes", n)
 	log.DebugDumpHex(reply[:n])
 
-	if reply[0] != 0x01 {
-		return nil, errors.New("unexpected recv handshake reply")
+	if n < 1 {
+		return nil, errors.New("empty recv handshake reply")
 	}
-
-	succeeded = true
-	return conn, nil
+	switch reply[0] {
+	case 0x01:
+		succeeded = true
+		return conn, nil
+	case 0x08:
+		log.Printf("RecvConn: server returned SHUTDOWN (cmd 0x08); session terminated by server")
+		return nil, ErrSangforShutdown
+	case 0x05, 0x06, 0x07, 0x09:
+		log.Printf("RecvConn: server returned RECONNECTLATER (cmd 0x%02x); should re-login and retry", reply[0])
+		return nil, ErrSangforReconnectLater
+	default:
+		return nil, fmt.Errorf("unexpected recv handshake reply: 0x%02x", reply[0])
+	}
 }
 
 // SendConn create a special TLS connection to send data to the VPN server.

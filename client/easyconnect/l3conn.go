@@ -1,6 +1,7 @@
 package easyconnect
 
 import (
+	"errors"
 	"io"
 	"sync"
 
@@ -25,6 +26,13 @@ func (c *L3Conn) Read(p []byte) (n int, err error) {
 	defer c.recvLock.Unlock()
 	for n, err = c.recvConn.Read(p); err != nil && c.recvErrCount < 5; {
 
+		// A SHUTDOWN means the server killed the session (often because the
+		// account logged in elsewhere). Re-handshaking with the same token
+		// cannot recover; surface it so the caller can do a full re-login.
+		if errors.Is(err, ErrSangforShutdown) {
+			return 0, err
+		}
+
 		log.Printf("Error occurred while receiving, retrying: %v", err)
 
 		// Do handshake again and create a new recvConn
@@ -46,6 +54,10 @@ func (c *L3Conn) Write(p []byte) (n int, err error) {
 	c.sendLock.Lock()
 	defer c.sendLock.Unlock()
 	for n, err = c.sendConn.Write(p); err != nil && c.sendErrCount < 5; {
+		if errors.Is(err, ErrSangforShutdown) {
+			return 0, err
+		}
+
 		log.Printf("Error occurred while sending, retrying: %v", err)
 
 		// Do handshake again and create a new sendConn
