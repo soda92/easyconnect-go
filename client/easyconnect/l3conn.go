@@ -101,6 +101,7 @@ func (c *Client) NewL3Conn() (io.ReadWriteCloser, error) {
 	conn.recvConn, err = c.RecvConn()
 	if err != nil {
 		log.Printf("Error occurred while creating recvConn: %v", err)
+		_ = conn.sendConn.Close()
 		return nil, err
 	}
 	return conn, nil
