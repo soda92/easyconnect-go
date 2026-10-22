@@ -4,6 +4,16 @@ Comparison between the Sangfor Linux packages and the Go implementation.
 Vendor package defects are in
 [`legacy_client_binary_defects.md`](legacy_client_binary_defects.md).
 
+## Implementation status (2026 hardening pass)
+
+- The vpngui EasyConnect provider now defaults to verified TLS and exposes CA,
+  client-certificate, and client-key fields plus an explicit insecure option.
+- `easyconnect` uses the supplied TLS config for its HTTP, uTLS, and pinned-cert
+  paths; the provider can pass a client certificate.
+- aTrust’s standalone TLS defaults remain separate; Windows code signing is
+  pending because no certificate is available.
+
+
 ## 1. Parity matrix
 
 | Control | Sangfor Linux packages | Go client / vpngui | Status |

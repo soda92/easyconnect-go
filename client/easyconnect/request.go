@@ -416,12 +416,13 @@ func (c *Client) loginCert() error {
 		return errors.New("failed to parse server certificate")
 	}
 
-	c.setHTTPTransport(&tls.Config{
-		InsecureSkipVerify: true,
-		Renegotiation:      tls.RenegotiateOnceAsClient,
-		Certificates:       []tls.Certificate{c.tlsCert},
-		RootCAs:            caCertPool,
-	})
+	pinCfg := c.tlsConfig.Clone()
+	pinCfg.Renegotiation = tls.RenegotiateOnceAsClient
+	pinCfg.Certificates = []tls.Certificate{c.tlsCert}
+	if !pinCfg.InsecureSkipVerify {
+		pinCfg.RootCAs = caCertPool
+	}
+	c.setHTTPTransport(pinCfg)
 
 	addr = "https://" + c.server + "/por/login_cert.csp?anti_replay=1&encrypt=1&type=cs"
 	log.Printf("Cert Request: %s", addr)
@@ -592,8 +593,11 @@ func (c *Client) requestToken() error {
 	defer func(dialConn net.Conn) {
 		_ = dialConn.Close()
 	}(dialConn)
+	tlsCfg := c.tlsConfig.Clone()
 	conn := utls.UClient(dialConn, &utls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: tlsCfg.InsecureSkipVerify,
+		RootCAs:            tlsCfg.RootCAs,
+		ServerName:         tlsCfg.ServerName,
 		KeyLogWriter:       c.tlsKeyLogWriter,
 	}, utls.HelloGolang)
 	defer func(conn *utls.UConn) {

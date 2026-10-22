@@ -46,6 +46,9 @@ type Options struct {
 	UnderlayDialer   client.UnderlayDialer
 	TLSKeyLogWriter  io.Writer
 	ChallengeHandler authchallenge.Handler
+	// TLSConfig controls HTTP and tunnel certificate verification. Nil keeps
+	// the legacy standalone-CLI behavior (insecure) for compatibility.
+	TLSConfig *tls.Config
 }
 
 type Client struct {
@@ -62,6 +65,7 @@ type Client struct {
 	httpClient        *http.Client
 	underlayDialer    client.UnderlayDialer
 	tlsKeyLogWriter   io.Writer
+	tlsConfig         *tls.Config
 	rawRequestTimeout time.Duration
 
 	twfID string
@@ -96,6 +100,15 @@ func NewClient(options Options) *Client {
 	if challengeHandler == nil {
 		challengeHandler = authchallenge.NewCLIHandler(authchallenge.CLIOptions{})
 	}
+	tlsCfg := options.TLSConfig
+	if tlsCfg == nil {
+		tlsCfg = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // standalone CLI compatibility
+	} else {
+		tlsCfg = tlsCfg.Clone()
+	}
+	if len(options.Auth.Certificate.Certificate) > 0 {
+		tlsCfg.Certificates = []tls.Certificate{options.Auth.Certificate}
+	}
 	c := &Client{
 		server:            options.Server,
 		username:          options.Auth.Username,
@@ -108,6 +121,7 @@ func NewClient(options Options) *Client {
 		httpClient:        &http.Client{Timeout: easyConnectHTTPTimeout},
 		underlayDialer:    options.UnderlayDialer,
 		tlsKeyLogWriter:   options.TLSKeyLogWriter,
+		tlsConfig:         tlsCfg.Clone(),
 		rawRequestTimeout: easyConnectRawRequestTimeout,
 		twfID:             options.SessionID,
 		lifecycleCtx:      lifecycleCtx,
@@ -115,7 +129,7 @@ func NewClient(options Options) *Client {
 		graphCodeFile:     options.Auth.GraphCodeFile,
 		challengeHandler:  challengeHandler,
 	}
-	c.setHTTPTransport(&tls.Config{InsecureSkipVerify: true})
+	c.setHTTPTransport(c.tlsConfig)
 	return c
 }
 
