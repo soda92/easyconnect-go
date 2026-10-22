@@ -12,10 +12,10 @@ import (
 )
 
 func TestTunnelTLSConfigMatchesOfficialTransport(t *testing.T) {
-	config := tunnelTLSConfig(nil)
+	config := tunnelTLSConfig(&tls.Config{InsecureSkipVerify: true}, nil)
 
 	if !config.InsecureSkipVerify {
-		t.Fatal("tunnel certificate verification must be disabled")
+		t.Fatal("caller's insecure policy should be retained")
 	}
 	if !config.SessionTicketsDisabled {
 		t.Fatal("tunnel TLS session tickets must be disabled")
@@ -30,7 +30,7 @@ func TestTunnelTLSConfigMatchesOfficialTransport(t *testing.T) {
 
 func TestTunnelTLSConfigUsesKeyLogWriter(t *testing.T) {
 	var writer bytes.Buffer
-	config := tunnelTLSConfig(&writer)
+	config := tunnelTLSConfig(&tls.Config{InsecureSkipVerify: true}, &writer)
 	if config.KeyLogWriter != &writer {
 		t.Fatal("tunnel TLS config did not receive the client key-log writer")
 	}

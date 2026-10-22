@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -35,6 +36,8 @@ type ClientOptions struct {
 	Session         SessionOptions
 	UnderlayDialer  client.UnderlayDialer
 	TLSKeyLogWriter io.Writer
+	// TLSConfig controls gateway and tunnel certificate verification.
+	TLSConfig *tls.Config
 }
 
 type SetupOptions struct {
@@ -89,11 +92,18 @@ type Client struct {
 	closeOnce        sync.Once
 	underlayDialer   client.UnderlayDialer
 	tlsKeyLogWriter  io.Writer
+	tlsConfig        *tls.Config
 	tcpTunnelZeroRTT bool
 }
 
 func NewClient(options ClientOptions) *Client {
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
+	tlsCfg := options.TLSConfig
+	if tlsCfg == nil {
+		tlsCfg = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // standalone CLI compatibility
+	} else {
+		tlsCfg = tlsCfg.Clone()
+	}
 	return &Client{
 		Username:        options.Session.Username,
 		SID:             options.Session.SID,
@@ -101,6 +111,7 @@ func NewClient(options ClientOptions) *Client {
 		SignKey:         options.Session.SignKey,
 		underlayDialer:  options.UnderlayDialer,
 		tlsKeyLogWriter: options.TLSKeyLogWriter,
+		tlsConfig:       tlsCfg,
 		lifecycleCtx:    lifecycleCtx,
 		lifecycleCancel: lifecycleCancel,
 	}
@@ -343,7 +354,7 @@ func (c *Client) Setup(options SetupOptions) ([]byte, error) {
 	} else {
 		authServerHost = fmt.Sprintf("%s:%d", options.ServerAddress, options.ServerPort)
 	}
-	sess := auth.NewSession(authServerHost, c.tlsKeyLogWriter, c.underlayDialer.DialContext)
+	sess := auth.NewSessionWithTLS(authServerHost, c.tlsKeyLogWriter, c.tlsConfig, c.underlayDialer.DialContext)
 	serverVersionInfo, manifestErr := sess.ServerVersionInfo()
 	serverVersionInfo, err := resolveServerVersionInfo(clientAuthData.ServerVersionInfo, serverVersionInfo, manifestErr)
 	if err != nil {

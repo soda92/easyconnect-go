@@ -113,12 +113,22 @@ type Session struct {
 }
 
 func NewSession(server string, tlsKeyLogWriter io.Writer, dialContext ...client.DialContextFunc) *Session {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			KeyLogWriter:       tlsKeyLogWriter,
-		},
+	return NewSessionWithTLS(server, tlsKeyLogWriter, &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec // standalone CLI compatibility
+	}, dialContext...)
+}
+
+// NewSessionWithTLS builds a session with an explicit TLS policy.
+func NewSessionWithTLS(server string, tlsKeyLogWriter io.Writer, tlsCfg *tls.Config, dialContext ...client.DialContextFunc) *Session {
+	if tlsCfg == nil {
+		tlsCfg = &tls.Config{}
+	} else {
+		tlsCfg = tlsCfg.Clone()
 	}
+	if tlsKeyLogWriter != nil {
+		tlsCfg.KeyLogWriter = tlsKeyLogWriter
+	}
+	tr := &http.Transport{TLSClientConfig: tlsCfg}
 	if len(dialContext) > 0 && dialContext[0] != nil {
 		tr.DialContext = dialContext[0]
 	}

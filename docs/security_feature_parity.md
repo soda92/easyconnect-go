@@ -10,7 +10,9 @@ Vendor package defects are in
   client-certificate, and client-key fields plus an explicit insecure option.
 - `easyconnect` uses the supplied TLS config for its HTTP, uTLS, and pinned-cert
   paths; the provider can pass a client certificate.
-- aTrust’s standalone TLS defaults remain separate; Windows code signing is
+- vpngui now registers a dedicated **aTrust** provider using the aTrust engine
+  (password/domain/TOTP login, userspace/TUN).
+- aTrust’s standalone CLI TLS defaults remain separate; Windows code signing is
   pending because no certificate is available.
 
 
