@@ -18,7 +18,8 @@ Vendor package defects are in
 | Gateway TLS validation | EasyConnect installs a CA via `ECAgent --install-import-cert`; aTrust has anti-MITM but also insecure TLS setup | `InsecureSkipVerify: true` throughout; no CA/pin | **Missing / weaker** |
 | Certificate pinning | Vendor imports a CA; aTrust anti-MITM certificate check | No CA/pin; only aTrust anti-MITM where server enables it | **Missing** |
 | Client certificate auth | EasyConnect supports a certificate in its auth options; provider does not expose it | Library supports `tls.Certificate`, but vpngui provider exposes only user/password/TOTP | **Provider gap** |
-| Windows signing | Windows installers are signed by Sangfor | Release executable unsigned | **Missing** |
+| Windows signing | Windows installers and main clients are signed by Sangfor | Release executable unsigned | **Missing** |
+| Windows package hygiene | Debug CRT DLLs, unsigned SQLite, IE BHO, large bundled module set | No debug CRT, SQLite, BHO, or module installers | **Better** |
 | Package integrity | Linux `.deb` files are unsigned; install scripts run as root | Locally built package; Windows exe unsigned | Weak on both sides |
 | Auto-update | Vendor updater/browser components present | No auto-updater | Smaller attack surface |
 

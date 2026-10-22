@@ -1,7 +1,7 @@
 # Legacy Sangfor EasyConnect / aTrust Linux Package Security Review
 
-Binary/package review of the Sangfor Linux clients used for EasyConnect and
-aTrust. Windows installers are present locally but not yet unpacked in this pass.
+Binary/package review of the Sangfor Linux and Windows clients used for
+EasyConnect and aTrust.
 
 The Docker build references are preserved under the gitignored
 `bin/docker-easyconnect/` directory.
@@ -13,11 +13,55 @@ The Docker build references are preserved under the gitignored
 | `easyconn_7.6.8.2-ubuntu_amd64.deb` | `shmilee/scripts` release (used by docker-easyconnect CLI) | `4d84010334bc46bb68daddda5092030ee02d17a8408b94f7ae951722c863c2b0` |
 | `EasyConnect_x64_7_6_7_3.deb` | official Sangfor CDN | `ae623c6dc0354ff87afefbb770de5013bfd943051c9a653b93db708253b2f0d3` |
 | `aTrustInstaller_2.5.16.20_amd64.deb` | official aTrust CDN | `fea38f63297e2c9bf853f33c566130a2f62f406926f60cf4e87f6d24a8e397d9` |
+| `EasyConnectInstaller_M7.6.7_20211216.exe` | official Windows installer | `47f78b52869af497b128b5bce7a3f31bdbdd7cc1aca5b80ad305cd8778580eef` |
+| `aTrustInstaller[https@111.204.197.13@60201].exe` | official Windows installer | `665109d0bb1cf4f69e909c254307dc07fe0b4a01f83b8ddcee36341b4086ef2d` |
 
 The Linux `.deb` packages do not carry a verifiable package signature in the
 archive members; the install scripts run as root directly from the package.
 
-## 2. EasyConnect Linux: setuid root services
+## 2. Windows installers: signed but heavily bundled
+
+Both Windows installers are Authenticode-signed by
+**Sangfor Technologies Inc.**, and the extracted main EasyConnect/aTrust
+executables are also Sangfor-signed. The Windows builds therefore have a better
+signing posture than the Linux packages, but the bundles remain large and
+privileged.
+
+### EasyConnect Windows
+
+- The NSIS bundle carries ~35 MB of module installers: UI, CSClient, ECAgent,
+  service client, update service, USB-key manager, browser helper, DNS/TCP/WFP
+  drivers, and virtual NIC.
+- `EasyConnectUI` ships **debug CRT DLLs**: `msvcp140d.dll`, `ucrtbased.dll`,
+  and `vcruntime140d.dll`. They are Microsoft-signed but are debug builds and
+  should not be distributed in a production client.
+- `sqlite3.dll` is unsigned with `DllCharacteristics=0` (no ASLR/DEP).
+- `SangforServiceClient.exe` has `DllCharacteristics=0` (no ASLR/DEP).
+- The installer carries `MD5` module manifests under
+  `Sangfor/SSL/MD5/*.xml`; the update path therefore appears to use MD5-based
+  integrity metadata rather than a signature.
+- `SangforVnic.sys`, `WfpDrvX64.sys`, and `DnsDrvx64.sys` are Sangfor-signed;
+  the VNIC catalog is also Sangfor-signed, not WHQL. The drivers enable CFG
+  (`DllCharacteristics=0x4160`).
+- `SangforBHO.dll` is an IE browser helper object, adding legacy browser
+  attack surface.
+
+### aTrust Windows
+
+- The outer installer is signed by Sangfor; the embedded `app.7z` contains a
+  109 MB Electron tray, a 27 MB x64 tunnel binary, a 3.2 MB agent, CSP,
+  diagnosis/firewall tools, UEM packages, and native drivers.
+- `aTrustAgent.exe`, `aTrustTray.exe`, `aTrustXtunnel.exe`, and
+  `aTrustCsp.exe` are Sangfor-signed. The agent/CSP/tunnel have ASLR/DEP;
+  `aTrustTray` additionally has CFG.
+- `aTrustXtunnel.exe` is a console x64 binary with ASLR/DEP/high-entropy VA,
+  but no CFG.
+- `SdpVnic.sys` is Sangfor-signed with a WHQL catalog; `SdpNetFilter.sys` is
+  WHQL-signed by Microsoft.
+- The Electron tray and embedded UEM components create a much larger attack
+  surface than the VPN tunnel itself.
+
+## 3. EasyConnect Linux: setuid root services
 
 `postinst` installs to `/usr/share/sangfor/EasyConnect` and runs
 `change_authority` as root:
@@ -52,7 +96,7 @@ Additional issues:
 ELF hardening of the Linux EasyConnect binaries is otherwise good: PIE, full
 RELRO, `BIND_NOW`, non-executable stack, and stack canaries.
 
-## 3. aTrust Linux: root services and unsafe permissions
+## 4. aTrust Linux: root services and unsafe permissions
 
 `aTrustInstaller_2.5.16.20_amd64.deb` includes an Electron tray
 (`aTrustTray`, 129 MB), native Node addons, and a root `aTrustDaemon` service.
@@ -119,7 +163,7 @@ The `uem_installer` path also conditionally receives `chmod a+s` when present.
 - `aTrustTray` is a very large Electron binary; the tray is run with
   `--no-sandbox`.
 
-## 4. Docker-easyconnect findings
+## 5. Docker-easyconnect findings
 
 The preserved reference (`bin/docker-easyconnect/`) is a third-party Docker
 project, not an official Sangfor distribution. It contains:
@@ -139,7 +183,7 @@ Running the vendor postinst and setuid binaries inside a container limits host
 impact, but the container still runs the vendor code as root; it is not a
 substitute for fixing the client design.
 
-## 5. Positive findings
+## 6. Positive findings
 
 - EasyConnect Linux binaries are PIE, full RELRO, `BIND_NOW`, NX, and canaried.
 - aTrust’s main daemon/tray helpers are similarly hardened, and the package does
