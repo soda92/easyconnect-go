@@ -1,5 +1,11 @@
 # ZJU Connect
 
+
+## Security review
+
+- [Vendor Linux package defects](docs/legacy_client_binary_defects.md)
+- [Go security feature parity](docs/security_feature_parity.md)
+
 > 🚫 **免责声明**
 >
 > 本程序**按原样提供**，作者**不对程序的正确性或可靠性提供保证**，请使用者自行判断具体场景是否适合使用该程序，**使用该程序造成的问题或后果由使用者自行承担**！
