@@ -34,6 +34,48 @@ var errTOTPRequired = errors.New("TOTP required")
 var errCertRequired = errors.New("cert required")
 var errNotFound = errors.New("not found")
 
+// LoginError is a structured rejection from the gateway's login endpoint.
+// ErrorCode values observed in the field include 20004 (invalid credentials)
+// and 20007 (account disabled).
+type LoginError struct {
+	Result    string `xml:"Result"`
+	ErrorCode string `xml:"ErrorCode"`
+	Note      string `xml:"Note"`
+	Message   string `xml:"Message"`
+	ErrorMsg  string `xml:"ErrorMsg"`
+}
+
+func (e *LoginError) Error() string {
+	message := firstNonEmpty(e.Note, e.ErrorMsg, e.Message)
+	if message == "" {
+		message = "gateway rejected the login"
+	}
+	if e.ErrorCode != "" {
+		return fmt.Sprintf("login failed: %s (gateway error %s)", message, e.ErrorCode)
+	}
+	return "login failed: " + message
+}
+
+func parseLoginError(body string) *LoginError {
+	var reply LoginError
+	if err := xml.Unmarshal([]byte(body), &reply); err != nil {
+		return nil
+	}
+	if reply.ErrorCode == "" && reply.Note == "" && reply.Message == "" && reply.ErrorMsg == "" {
+		return nil
+	}
+	return &reply
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func (c *Client) requestTwfID(graphCodeFile string) error {
 	err := c.loginAuthAndPsw(graphCodeFile)
 	if err != nil {
@@ -230,7 +272,13 @@ func (c *Client) loginAuthAndPsw(graphCodeFile string) error {
 	}
 
 	if !strings.Contains(buf.String(), "<Result>1</Result>") {
-		return errors.New("Login failed: " + buf.String())
+		// Keep the raw XML in the log for diagnostics, but never put it in the
+		// user-facing error: gateways may return a large HTML/XML body.
+		log.Printf("Login failed: %s", buf.String())
+		if loginErr := parseLoginError(buf.String()); loginErr != nil {
+			return loginErr
+		}
+		return errors.New("login failed: gateway returned an unrecognized response")
 	}
 
 	twfIDMatch := regexp.MustCompile(`<TwfID>(.*)</TwfID>`).FindSubmatch(buf.Bytes())
