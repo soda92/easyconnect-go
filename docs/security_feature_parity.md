@@ -12,6 +12,10 @@ Vendor package defects are in
   paths; the provider can pass a client certificate.
 - vpngui now registers a dedicated **aTrust** provider using the aTrust engine
   (password/domain/TOTP login, userspace/TUN).
+- The EasyConnect provider exposes an optional per-profile SHA-256 leaf
+  certificate pin (`tls_pin`). For legacy self-signed certificates without a
+  SAN, combine it with explicit `insecure=true` so hostname verification is
+  skipped but the certificate is still authenticated.
 - aTrust’s standalone CLI TLS defaults remain separate; Windows code signing is
   pending because no certificate is available.
 
@@ -28,7 +32,7 @@ Vendor package defects are in
 | EasyConnect ELF hardening | PIE, full RELRO, BIND_NOW, NX, canary | Go PIE, full RELRO, BIND_NOW | Parity |
 | aTrust ELF hardening | Mostly PIE/full RELRO; `aTrustXtunnel-64` non-PIE; Go tool non-PIE | Go uses PIE | Better |
 | Gateway TLS validation | EasyConnect installs a CA via `ECAgent --install-import-cert`; aTrust has anti-MITM but also insecure TLS setup | `InsecureSkipVerify: true` throughout; no CA/pin | **Missing / weaker** |
-| Certificate pinning | Vendor imports a CA; aTrust anti-MITM certificate check | No CA/pin; only aTrust anti-MITM where server enables it | **Missing** |
+| Certificate pinning | Vendor imports a CA; aTrust anti-MITM certificate check | Optional leaf SHA-256 pin (`tls_pin`); no CA rotation/CRL | **Partial** |
 | Client certificate auth | EasyConnect supports a certificate in its auth options; provider does not expose it | Library supports `tls.Certificate`, but vpngui provider exposes only user/password/TOTP | **Provider gap** |
 | Windows signing | Windows installers and main clients are signed by Sangfor | Release executable unsigned | **Missing** |
 | Windows package hygiene | Debug CRT DLLs, unsigned SQLite, IE BHO, large bundled module set | No debug CRT, SQLite, BHO, or module installers | **Better** |
